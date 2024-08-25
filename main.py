@@ -2,6 +2,18 @@ from PIL import Image, ImageOps
 import pandas as pd
 import glob
 from pathlib import Path
+from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Alignment
+
+def fix_column_width(worksheet):
+    dims = {}
+    for row in worksheet.rows:
+        for cell in row:
+            if cell.value:
+                dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
+    for col, value in dims.items():
+        worksheet.column_dimensions[col].width = value
 
 base_path = '/Users/tassiovalle/Documents/optical-mark-recognizer'
 images_folder_path = f"{base_path}/images"
@@ -9,7 +21,7 @@ template_path = f"{base_path}/templates/gabarito.xlsx"
 
 images_list = glob.glob(f"{images_folder_path}/*")
 
-result = []
+results = []
 df = pd.read_excel(template_path)
 template_dict = df.set_index('Questão')['Resposta'].to_dict()
 
@@ -21,7 +33,7 @@ questions_per_block_quantity = 30
 
 total_questions = question_blocks_quantity * questions_per_block_quantity
 
-result.append({
+results.append({
     'name': 'Gabarito',
     'correct_questions_quantity': total_questions,
     'correct_questions_percentage' : 100,
@@ -89,11 +101,35 @@ for image_path in images_list:
                 correct_questions_quantity += 1
             question_index += 1
 
-    result.append({
+    results.append({
         'name': Path(image_path).stem,
         'correct_questions_quantity': correct_questions_quantity,
         'correct_questions_percentage': (correct_questions_quantity / total_questions) * 100,
         'answers': student_answers
     })
-    print(result)
-    exit()
+
+file_name = 'resultados_' + datetime.now().strftime("%Y%m%d-%H%M%S") + '.xlsx'
+workbook = Workbook()
+
+worksheet = workbook.active
+worksheet.title = "Gabarito e resultados"
+
+spreadsheet_column_index = 1
+worksheet.cell(row=1, column=spreadsheet_column_index).value = ''
+for row_index in range(1, total_questions + 1):
+    worksheet.cell(row=row_index+1, column=spreadsheet_column_index).value = row_index
+worksheet.cell(row=total_questions + 2, column=spreadsheet_column_index).value = 'Questões corretas'
+worksheet.cell(row=total_questions + 3, column=spreadsheet_column_index).value = 'Percentual de acerto'
+
+spreadsheet_column_index += 1
+for result in results:
+    worksheet.cell(row=1, column=spreadsheet_column_index).value = result['name']
+    for row_index in range(1, total_questions + 1):
+        worksheet.cell(row=row_index+1, column=spreadsheet_column_index).value = result['answers'][row_index]
+    worksheet.cell(row=total_questions + 2, column=spreadsheet_column_index).value = result['correct_questions_quantity']
+    worksheet.cell(row=total_questions + 3, column=spreadsheet_column_index).value = result['correct_questions_percentage']
+    spreadsheet_column_index += 1
+
+fix_column_width(worksheet)
+workbook.save(file_name)
+workbook.close()
