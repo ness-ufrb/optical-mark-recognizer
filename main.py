@@ -26,11 +26,9 @@ template_dict = df.set_index('Questão')['Resposta'].to_dict()
 
 # Quantity of questions
 question_blocks_quantity = int(os.getenv("question_blocks_quantity"))
-
-# Quantity of questions
 questions_per_block_quantity = int(os.getenv("questions_per_block_quantity"))
-
-total_questions = question_blocks_quantity * questions_per_block_quantity
+total_questions = int(os.getenv("total_questions"))
+question_index_initial_value = int(os.getenv("question_index_initial_value"))
 
 results.append({
     'name': 'Gabarito',
@@ -53,10 +51,17 @@ for image_path in images_list:
     name_height = int(os.getenv("name_height"))
     name_width = int(os.getenv("name_width"))
     name_area = gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
+
+    #### FOR TESTING PURPOSES ONLY ####
+    # name_area.save('name_area.png')
+    # exit()
+    #### FOR TESTING PURPOSES ONLY ####
+
     img_byte_arr = io.BytesIO()
     name_area.save(img_byte_arr, format='PNG')
     img_byte_arr = img_byte_arr.getvalue()
     ocr_result = ocr_reader.readtext(img_byte_arr)
+    
     name = ''
     for result_set in ocr_result:
         for item in result_set:
@@ -95,29 +100,44 @@ for image_path in images_list:
 
     # Array to store the student number
     student_answers = {}
-    question_index_initial_value = int(os.getenv("question_index_initial_value"))
     question_index = question_index_initial_value - 1
     correct_questions_quantity = 0
 
     # Check the density of the marked area for each column and row
     for block_index in range(question_blocks_quantity):  # For 4 blocks
         for row_index in range(questions_per_block_quantity):  # For 30 questions
-            row = row_start_y + row_index * row_spacing
+            row = row_start_y + row_index * row_spacing + row_index * circle_height
             for col_index in range(alternatives_quantity):  # For 5 columns
-                col = column_start_x + col_index * column_spacing + block_index * block_spacing
+                col = column_start_x + \
+                    col_index * column_spacing + \
+                    col_index * circle_width + \
+                    block_index * block_spacing + \
+                    block_index * alternatives_quantity * circle_width + \
+                    block_index * (alternatives_quantity - 1) * column_spacing
                 # Crop the relevant area
                 mark_area = binary_image.crop((col, row, col + circle_width, row + circle_height))
+                
+                #### FOR TESTING PURPOSES ONLY ####
+                # if question_index + 1 == 2 or question_index + 1 == 30 or question_index + 1 == 80 or question_index + 1 == 90:
+                #     question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
+                #     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
+                #### FOR TESTING PURPOSES ONLY ####
+                
                 # Count the number of black pixels
                 black_pixels_count = sum(1 for pixel in mark_area.getdata() if pixel == 0)
                 # If there are more black pixels than the threshold value, accept it as marked
                 if black_pixels_count > black_pixels_threshold:
                     student_answers[question_index + 1] = alternatives[col_index]
-                    break  # Move to the next column
+                    # break  # Move to the next column
             if not student_answers.get(question_index + 1):
                 student_answers[question_index + 1] = '-'
             if student_answers.get(question_index + 1) == template_dict.get(question_index + 1):
                 correct_questions_quantity += 1
             question_index += 1
+            if question_index + 1 > total_questions:
+                break
+        if question_index + 1 > total_questions:
+            break
 
     results.append({
         'name': name,
@@ -144,8 +164,7 @@ worksheet.cell(row=spreadsheet_row_index, column=4).value = 'Percentual de acert
 worksheet.column_dimensions['D'].width = 20
 for column_index in range(total_questions):
     worksheet.column_dimensions[get_column_letter(column_index + 5)].width = 5
-    worksheet.cell(row=spreadsheet_row_index, column=column_index + 4).value = question_index_initial_value + column_index
-
+    worksheet.cell(row=spreadsheet_row_index, column=column_index + 5).value = question_index_initial_value + column_index
 spreadsheet_row_index += 1
 for result in results:
     worksheet.cell(row=spreadsheet_row_index, column=1).value = result['file']
