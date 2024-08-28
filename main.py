@@ -1,23 +1,18 @@
+import os
 from PIL import Image, ImageOps
 import pandas as pd
 import glob
 from pathlib import Path
 from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
+from dotenv import load_dotenv
 
-def fix_column_width(worksheet):
-    dims = {}
-    for row in worksheet.rows:
-        for cell in row:
-            if cell.value:
-                dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
-    for col, value in dims.items():
-        worksheet.column_dimensions[col].width = value
+load_dotenv(override=True)
 
-base_path = '/Users/tassiovalle/Documents/optical-mark-recognizer'
-images_folder_path = f"{base_path}/images"
-template_path = f"{base_path}/templates/gabarito.xlsx"
+base_path = os.getenv("base_path")
+images_folder_path = f"{base_path}/imagens"
+template_path = f"{base_path}/gabarito.xlsx"
 
 images_list = glob.glob(f"{images_folder_path}/*")
 
@@ -26,10 +21,10 @@ df = pd.read_excel(template_path)
 template_dict = df.set_index('Questão')['Resposta'].to_dict()
 
 # Quantity of questions
-question_blocks_quantity = 4
+question_blocks_quantity = int(os.getenv("question_blocks_quantity"))
 
 # Quantity of questions
-questions_per_block_quantity = 30
+questions_per_block_quantity = int(os.getenv("questions_per_block_quantity"))
 
 total_questions = question_blocks_quantity * questions_per_block_quantity
 
@@ -48,7 +43,7 @@ for image_path in images_list:
     gray_image = ImageOps.grayscale(image)
 
     # Black pixel limit verification
-    dark_pixel_threshold = 200
+    dark_pixel_threshold = int(os.getenv("dark_pixel_threshold"))
 
     # Convert the image to binary format
     binary_image = gray_image.point(lambda x: 0 if x < 128 else 255, '1')
@@ -61,24 +56,25 @@ for image_path in images_list:
     alternatives = ['A', 'B', 'C', 'D', 'E']
 
     # The x-coordinate of the first column and spacing between columns
-    column_start_x = 326
-    column_spacing = 47
-    block_spacing = 570
+    column_start_x = int(os.getenv("column_start_x"))
+    column_spacing = int(os.getenv("column_spacing"))
+    block_spacing = int(os.getenv("block_spacing"))
 
     # The y-coordinate of the first row and spacing between rows
-    row_start_y = 1613
-    row_spacing = 48
+    row_start_y = int(os.getenv("row_start_y"))
+    row_spacing = int(os.getenv("row_spacing"))
 
     # The width and height of each circle
-    circle_width = 41
-    circle_height = 41
+    circle_width = int(os.getenv("circle_width"))
+    circle_height = int(os.getenv("circle_height"))
 
     # Threshold value
     black_pixels_threshold = 1000  # General threshold value set to 35
 
     # Array to store the student number
     student_answers = {}
-    question_index = 0
+    question_index_initial_value = int(os.getenv("question_index_initial_value"))
+    question_index = question_index_initial_value - 1
     correct_questions_quantity = 0
 
     # Check the density of the marked area for each column and row
@@ -108,28 +104,31 @@ for image_path in images_list:
         'answers': student_answers
     })
 
-file_name = 'resultados_' + datetime.now().strftime("%Y%m%d-%H%M%S") + '.xlsx'
+file_name = base_path + '/resultados_' + datetime.now().strftime("%Y%m%d-%H%M%S") + '.xlsx'
 workbook = Workbook()
 
 worksheet = workbook.active
 worksheet.title = "Gabarito e resultados"
 
-spreadsheet_column_index = 1
-worksheet.cell(row=1, column=spreadsheet_column_index).value = ''
-for row_index in range(1, total_questions + 1):
-    worksheet.cell(row=row_index+1, column=spreadsheet_column_index).value = row_index
-worksheet.cell(row=total_questions + 2, column=spreadsheet_column_index).value = 'Questões corretas'
-worksheet.cell(row=total_questions + 3, column=spreadsheet_column_index).value = 'Percentual de acerto'
+spreadsheet_row_index = 1
+worksheet.cell(row=spreadsheet_row_index, column=1).value = ''
+worksheet.column_dimensions['A'].width = 50
+worksheet.cell(row=spreadsheet_row_index, column=2).value = 'Questões corretas'
+worksheet.column_dimensions['B'].width = 20
+worksheet.cell(row=spreadsheet_row_index, column=3).value = 'Percentual de acerto'
+worksheet.column_dimensions['C'].width = 20
+for column_index in range(total_questions):
+    worksheet.column_dimensions[get_column_letter(column_index + 4)].width = 5
+    worksheet.cell(row=spreadsheet_row_index, column=column_index + 4).value = question_index_initial_value + column_index
 
-spreadsheet_column_index += 1
+spreadsheet_row_index += 1
 for result in results:
-    worksheet.cell(row=1, column=spreadsheet_column_index).value = result['name']
-    for row_index in range(1, total_questions + 1):
-        worksheet.cell(row=row_index+1, column=spreadsheet_column_index).value = result['answers'][row_index]
-    worksheet.cell(row=total_questions + 2, column=spreadsheet_column_index).value = result['correct_questions_quantity']
-    worksheet.cell(row=total_questions + 3, column=spreadsheet_column_index).value = result['correct_questions_percentage']
-    spreadsheet_column_index += 1
+    worksheet.cell(row=spreadsheet_row_index, column=1).value = result['name']
+    worksheet.cell(row=spreadsheet_row_index, column=2).value = result['correct_questions_quantity']
+    worksheet.cell(row=spreadsheet_row_index, column=3).value = result['correct_questions_percentage']
+    for column_index in range(total_questions):
+        worksheet.cell(row=spreadsheet_row_index, column=column_index + 4).value = result['answers'][question_index_initial_value + column_index]
+    spreadsheet_row_index += 1
 
-fix_column_width(worksheet)
 workbook.save(file_name)
 workbook.close()
