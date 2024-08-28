@@ -1,4 +1,5 @@
 import os
+import io
 from PIL import Image, ImageOps
 import pandas as pd
 import glob
@@ -7,8 +8,11 @@ from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from dotenv import load_dotenv
+import easyocr
 
 load_dotenv(override=True)
+
+ocr_reader = easyocr.Reader(['pt'])
 
 base_path = os.getenv("base_path")
 images_folder_path = f"{base_path}/imagens"
@@ -30,6 +34,7 @@ total_questions = question_blocks_quantity * questions_per_block_quantity
 
 results.append({
     'name': 'Gabarito',
+    'file': 'N/A',
     'correct_questions_quantity': total_questions,
     'correct_questions_percentage' : 100,
     'answers': template_dict
@@ -41,6 +46,23 @@ for image_path in images_list:
 
     # Converting the Image to Grayscale
     gray_image = ImageOps.grayscale(image)
+
+    # Getting name
+    name_start_x = int(os.getenv("name_start_x"))
+    name_start_y = int(os.getenv("name_start_y"))
+    name_height = int(os.getenv("name_height"))
+    name_width = int(os.getenv("name_width"))
+    name_area = gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
+    img_byte_arr = io.BytesIO()
+    name_area.save(img_byte_arr, format='PNG')
+    img_byte_arr = img_byte_arr.getvalue()
+    ocr_result = ocr_reader.readtext(img_byte_arr)
+    name = ''
+    for result_set in ocr_result:
+        for item in result_set:
+            if (isinstance(item, str)) and len(item) > 5:
+                name = item
+                break
 
     # Black pixel limit verification
     dark_pixel_threshold = int(os.getenv("dark_pixel_threshold"))
@@ -98,7 +120,8 @@ for image_path in images_list:
             question_index += 1
 
     results.append({
-        'name': Path(image_path).stem,
+        'name': name,
+        'file': Path(image_path).stem,
         'correct_questions_quantity': correct_questions_quantity,
         'correct_questions_percentage': (correct_questions_quantity / total_questions) * 100,
         'answers': student_answers
@@ -111,23 +134,26 @@ worksheet = workbook.active
 worksheet.title = "Gabarito e resultados"
 
 spreadsheet_row_index = 1
-worksheet.cell(row=spreadsheet_row_index, column=1).value = ''
+worksheet.cell(row=spreadsheet_row_index, column=1).value = 'Arquivo'
 worksheet.column_dimensions['A'].width = 50
-worksheet.cell(row=spreadsheet_row_index, column=2).value = 'Questões corretas'
-worksheet.column_dimensions['B'].width = 20
-worksheet.cell(row=spreadsheet_row_index, column=3).value = 'Percentual de acerto'
+worksheet.cell(row=spreadsheet_row_index, column=2).value = 'Nome'
+worksheet.column_dimensions['B'].width = 50
+worksheet.cell(row=spreadsheet_row_index, column=3).value = 'Questões corretas'
 worksheet.column_dimensions['C'].width = 20
+worksheet.cell(row=spreadsheet_row_index, column=4).value = 'Percentual de acerto'
+worksheet.column_dimensions['D'].width = 20
 for column_index in range(total_questions):
-    worksheet.column_dimensions[get_column_letter(column_index + 4)].width = 5
+    worksheet.column_dimensions[get_column_letter(column_index + 5)].width = 5
     worksheet.cell(row=spreadsheet_row_index, column=column_index + 4).value = question_index_initial_value + column_index
 
 spreadsheet_row_index += 1
 for result in results:
-    worksheet.cell(row=spreadsheet_row_index, column=1).value = result['name']
-    worksheet.cell(row=spreadsheet_row_index, column=2).value = result['correct_questions_quantity']
-    worksheet.cell(row=spreadsheet_row_index, column=3).value = result['correct_questions_percentage']
+    worksheet.cell(row=spreadsheet_row_index, column=1).value = result['file']
+    worksheet.cell(row=spreadsheet_row_index, column=2).value = result['name']
+    worksheet.cell(row=spreadsheet_row_index, column=3).value = result['correct_questions_quantity']
+    worksheet.cell(row=spreadsheet_row_index, column=4).value = result['correct_questions_percentage']
     for column_index in range(total_questions):
-        worksheet.cell(row=spreadsheet_row_index, column=column_index + 4).value = result['answers'][question_index_initial_value + column_index]
+        worksheet.cell(row=spreadsheet_row_index, column=column_index + 5).value = result['answers'][question_index_initial_value + column_index]
     spreadsheet_row_index += 1
 
 workbook.save(file_name)
