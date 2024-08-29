@@ -9,10 +9,12 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from dotenv import load_dotenv
 import easyocr
+import pytesseract
 
 load_dotenv(override=True)
 
-ocr_reader = easyocr.Reader(['pt'])
+# EASYOCR APPROACH
+# ocr_reader = easyocr.Reader(['pt'])
 
 base_path = os.getenv("base_path")
 images_folder_path = f"{base_path}/imagens"
@@ -57,17 +59,19 @@ for image_path in images_list:
     # exit()
     #### FOR TESTING PURPOSES ONLY ####
 
-    img_byte_arr = io.BytesIO()
-    name_area.save(img_byte_arr, format='PNG')
-    img_byte_arr = img_byte_arr.getvalue()
-    ocr_result = ocr_reader.readtext(img_byte_arr)
+    name = pytesseract.image_to_string(name_area)
+
+    # EASYOCR APPROACH
+    # img_byte_arr = io.BytesIO()
+    # name_area.save(img_byte_arr, format='PNG')
+    # img_byte_arr = img_byte_arr.getvalue()
+    # ocr_result = ocr_reader.readtext(img_byte_arr)
     
-    name = ''
-    for result_set in ocr_result:
-        for item in result_set:
-            if (isinstance(item, str)) and len(item) > 5:
-                name = item
-                break
+    # name = ''
+    # for result_set in ocr_result:
+    #     for item in result_set:
+    #         if (isinstance(item, str)) and len(item) > 5:
+    #             name = item
 
     # Black pixel limit verification
     dark_pixel_threshold = int(os.getenv("dark_pixel_threshold"))
@@ -118,7 +122,7 @@ for image_path in images_list:
                 mark_area = binary_image.crop((col, row, col + circle_width, row + circle_height))
                 
                 #### FOR TESTING PURPOSES ONLY ####
-                # if question_index + 1 == 2 or question_index + 1 == 30 or question_index + 1 == 80 or question_index + 1 == 90:
+                # if question_index + 1 == 2 or question_index + 1 == 9 or question_index + 1 == 11 or question_index + 1 == 20:
                 #     question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
                 #     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
                 #### FOR TESTING PURPOSES ONLY ####
