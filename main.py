@@ -1,5 +1,4 @@
 import os
-import io
 from PIL import Image, ImageOps
 import pandas as pd
 import glob
@@ -10,6 +9,7 @@ from openpyxl.utils import get_column_letter
 from dotenv import load_dotenv
 import easyocr
 import pytesseract
+from pdf2image import convert_from_path  # Add this for PDF conversion
 
 load_dotenv(override=True)
 
@@ -36,13 +36,19 @@ results.append({
     'name': 'Gabarito',
     'file': 'N/A',
     'correct_questions_quantity': total_questions,
-    'correct_questions_percentage' : 100,
+    'correct_questions_percentage': 100,
     'answers': template_dict
 })
 
-for image_path in images_list:
-    # Load the image
-    image = Image.open(image_path)
+for file_path in images_list:
+    # Check if file is a PDF
+    if file_path.lower().endswith('.pdf'):
+        # Convert PDF to images
+        pages = convert_from_path(file_path)
+        image = pages[0]  # Assuming the first page is the one we need
+    else:
+        # Load the image directly if it's not a PDF
+        image = Image.open(file_path)
 
     # Converting the Image to Grayscale
     gray_image = ImageOps.grayscale(image)
@@ -132,7 +138,6 @@ for image_path in images_list:
                 # If there are more black pixels than the threshold value, accept it as marked
                 if black_pixels_count > black_pixels_threshold:
                     student_answers[question_index + 1] = alternatives[col_index]
-                    # break  # Move to the next column
             if not student_answers.get(question_index + 1):
                 student_answers[question_index + 1] = '-'
             if student_answers.get(question_index + 1) == template_dict.get(question_index + 1):
@@ -145,7 +150,7 @@ for image_path in images_list:
 
     results.append({
         'name': name,
-        'file': Path(image_path).stem,
+        'file': Path(file_path).stem,
         'correct_questions_quantity': correct_questions_quantity,
         'correct_questions_percentage': (correct_questions_quantity / total_questions) * 100,
         'answers': student_answers
