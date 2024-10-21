@@ -7,7 +7,7 @@ from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from dotenv import load_dotenv
-import easyocr
+# import easyocr
 import pytesseract
 from pdf2image import convert_from_path  # Add this for PDF conversion
 
@@ -49,6 +49,8 @@ for file_path in images_list:
     else:
         # Load the image directly if it's not a PDF
         image = Image.open(file_path)
+
+    print(f"Processing {file_path}")
 
     # Converting the Image to Grayscale
     gray_image = ImageOps.grayscale(image)
@@ -128,7 +130,7 @@ for file_path in images_list:
                 mark_area = binary_image.crop((col, row, col + circle_width, row + circle_height))
                 
                 #### FOR TESTING PURPOSES ONLY ####
-                # if question_index + 1 == 2 or question_index + 1 == 9 or question_index + 1 == 11 or question_index + 1 == 20:
+                # if question_index + 1 == 81:
                 #     question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
                 #     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
                 #### FOR TESTING PURPOSES ONLY ####
@@ -147,6 +149,9 @@ for file_path in images_list:
                 break
         if question_index + 1 > total_questions:
             break
+    #### FOR TESTING PURPOSES ONLY ####
+    # exit()
+    #### FOR TESTING PURPOSES ONLY ####
 
     results.append({
         'name': name,
