@@ -31,6 +31,7 @@ question_blocks_quantity = int(os.getenv("question_blocks_quantity"))
 questions_per_block_quantity = int(os.getenv("questions_per_block_quantity"))
 total_questions = int(os.getenv("total_questions"))
 question_index_initial_value = int(os.getenv("question_index_initial_value"))
+black_pixels_threshold = int(os.getenv("black_pixels_threshold"))
 
 results.append({
     'name': 'Gabarito',
@@ -63,8 +64,8 @@ for file_path in images_list:
     name_area = gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
 
     #### FOR TESTING PURPOSES ONLY ####
-    # name_area.save('name_area.png')
-    # exit()
+    name_area.save('name_area.png')
+    exit()
     #### FOR TESTING PURPOSES ONLY ####
 
     name = pytesseract.image_to_string(name_area)
@@ -107,9 +108,6 @@ for file_path in images_list:
     circle_width = int(os.getenv("circle_width"))
     circle_height = int(os.getenv("circle_height"))
 
-    # Threshold value
-    black_pixels_threshold = 1000  # General threshold value set to 35
-
     # Array to store the student number
     student_answers = {}
     question_index = question_index_initial_value - 1
@@ -145,9 +143,9 @@ for file_path in images_list:
             if student_answers.get(question_index + 1) == template_dict.get(question_index + 1):
                 correct_questions_quantity += 1
             question_index += 1
-            if question_index + 1 > total_questions:
+            if question_index + 1 > question_index_initial_value + total_questions:
                 break
-        if question_index + 1 > total_questions:
+        if question_index + 1 > question_index_initial_value + total_questions:
             break
     #### FOR TESTING PURPOSES ONLY ####
     # exit()
