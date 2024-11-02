@@ -128,9 +128,9 @@ for file_path in images_list:
                 mark_area = binary_image.crop((col, row, col + circle_width, row + circle_height))
                 
                 #### FOR TESTING PURPOSES ONLY ####
-                # if question_index + 1 == 81:
-                #     question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
-                #     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
+                if question_index + 1 == 1 or question_index + 1 == 60 or question_index + 1 == 90:
+                    question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
+                    question_area.save(f"question_{question_index+1}_item_{col_index}.png")
                 #### FOR TESTING PURPOSES ONLY ####
                 
                 # Count the number of black pixels
@@ -148,7 +148,7 @@ for file_path in images_list:
         if question_index + 1 > question_index_initial_value + total_questions:
             break
     #### FOR TESTING PURPOSES ONLY ####
-    # exit()
+    exit()
     #### FOR TESTING PURPOSES ONLY ####
 
     results.append({
