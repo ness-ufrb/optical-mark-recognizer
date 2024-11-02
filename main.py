@@ -64,8 +64,8 @@ for file_path in images_list:
     name_area = gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
 
     #### FOR TESTING PURPOSES ONLY ####
-    name_area.save('name_area.png')
-    exit()
+    # name_area.save('name_area.png')
+    # exit()
     #### FOR TESTING PURPOSES ONLY ####
 
     name = pytesseract.image_to_string(name_area)
