@@ -128,7 +128,7 @@ for file_path in images_list:
                 mark_area = binary_image.crop((col, row, col + circle_width, row + circle_height))
                 
                 #### FOR TESTING PURPOSES ONLY ####
-                if question_index + 1 == 1 or question_index + 1 == 60 or question_index + 1 == 90:
+                if question_index + 1 == 2 or question_index + 1 == 10 or question_index + 1 == 15:
                     question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
                     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
                 #### FOR TESTING PURPOSES ONLY ####
