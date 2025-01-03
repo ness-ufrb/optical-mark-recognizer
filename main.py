@@ -7,11 +7,77 @@ from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from dotenv import load_dotenv
-# import easyocr
+import numpy as np
+import cv2
 import pytesseract
-from pdf2image import convert_from_path  # Add this for PDF conversion
+from pdf2image import convert_from_path
+# import easyocr
 
 load_dotenv(override=True)
+
+def align_image(gray_image):
+    # Convert PIL grayscale image to OpenCV format (NumPy array)
+    gray_cv = np.array(gray_image)
+
+    # Check if the image is already in uint8 format
+    if gray_cv.dtype != np.uint8:
+        gray_cv = gray_cv.astype(np.uint8)
+
+    # Use edge detection (Canny Edge Detection)
+    edges = cv2.Canny(gray_cv, 50, 150, apertureSize=3)
+
+    # Find lines using Probabilistic Hough Line Transform
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=100,
+        minLineLength=100,
+        maxLineGap=10
+    )
+
+    # If no lines are found, return the original image
+    if lines is None or len(lines) == 0:
+        print("No lines detected, unable to align image.")
+        return gray_image
+
+    # Calculate the angles of the detected lines
+    angles = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        angle_rad = np.arctan2(y2 - y1, x2 - x1)
+        angle_deg = np.degrees(angle_rad)
+        # Normalize angle to the range [-90, 90]
+        if angle_deg < -90:
+            angle_deg += 180
+        elif angle_deg > 90:
+            angle_deg -= 180
+        angles.append(angle_deg)
+
+    # Compute the median angle of the detected lines
+    median_angle = np.median(angles)
+
+    # If the median angle is near zero, the image is already aligned
+    if abs(median_angle) < 0.1:
+        print("Image is already aligned.")
+        return gray_image
+
+    # Rotate image to correct skew
+    (h, w) = gray_cv.shape
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, median_angle, 1.0)
+    aligned_gray_cv = cv2.warpAffine(
+        gray_cv,
+        M,
+        (w, h),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_REPLICATE
+    )
+
+    # Convert back to PIL Image format
+    aligned_gray_image = Image.fromarray(aligned_gray_cv)
+
+    return aligned_gray_image
 
 # EASYOCR APPROACH
 # ocr_reader = easyocr.Reader(['pt'])
@@ -56,12 +122,15 @@ for file_path in images_list:
     # Converting the Image to Grayscale
     gray_image = ImageOps.grayscale(image)
 
+    # Align the image
+    aligned_gray_image = align_image(gray_image)
+
     # Getting name
     name_start_x = int(os.getenv("name_start_x"))
     name_start_y = int(os.getenv("name_start_y"))
     name_height = int(os.getenv("name_height"))
     name_width = int(os.getenv("name_width"))
-    name_area = gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
+    name_area = aligned_gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
 
     #### FOR TESTING PURPOSES ONLY ####
     # name_area.save('name_area.png')
@@ -86,7 +155,7 @@ for file_path in images_list:
     dark_pixel_threshold = int(os.getenv("dark_pixel_threshold"))
 
     # Convert the image to binary format
-    binary_image = gray_image.point(lambda x: 0 if x < 128 else 255, '1')
+    binary_image = aligned_gray_image.point(lambda x: 0 if x < 128 else 255, '1')
 
     # Array to store the student number
     student_number = []
@@ -129,7 +198,7 @@ for file_path in images_list:
                 
                 #### FOR TESTING PURPOSES ONLY ####
                 if question_index + 1 == 2 or question_index + 1 == 10 or question_index + 1 == 15:
-                    question_area = gray_image.crop((col, row, col + circle_width, row + circle_height))
+                    question_area = aligned_gray_image.crop((col, row, col + circle_width, row + circle_height))
                     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
                 #### FOR TESTING PURPOSES ONLY ####
                 
