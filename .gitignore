@@ -164,3 +164,4 @@ cython_debug/
 upt2024/
 
 *.pdf
+*.xlsx
