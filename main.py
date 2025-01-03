@@ -80,7 +80,7 @@ def align_image(gray_image):
     return aligned_gray_image
 
 
-def find_second_bubble_position(aligned_image):
+def find_first_bubble_position(aligned_image):
     # Convert PIL image to OpenCV format
     image_cv = np.array(aligned_image)
 
@@ -141,18 +141,20 @@ def find_second_bubble_position(aligned_image):
         # Append to bubbles list
         bubbles.append({'contour': contour, 'rect': (x, y, w, h)})
 
-    if len(bubbles) < 2:
-        print("Less than two bubbles detected in the image.")
+    if len(bubbles) < 1:
+        print("No bubbles detected in the image.")
         return None, None
 
     # Sort the bubbles from top to bottom, then left to right, using 'rect' positions
     bubbles = sorted(bubbles, key=lambda b: (b['rect'][1], b['rect'][0]))
 
-    # Get the position of the second bubble
-    second_bubble = bubbles[1]
-    x, y, w, h = second_bubble['rect']
+    # Get the position of the first bubble
+    first_bubble = bubbles[0]
+    x, y, w, h = first_bubble['rect']
     # Return the initial x and y position (top-left corner)
-    return x, y
+    calculated_x = x - int(os.getenv("second_bubble_x_offset"))
+    calculated_y = y + int(os.getenv("second_bubble_y_offset"))
+    return calculated_x, calculated_y
 
 # EASYOCR APPROACH
 # ocr_reader = easyocr.Reader(['pt'])
@@ -244,7 +246,7 @@ for file_path in images_list:
     alternatives = ['A', 'B', 'C', 'D', 'E']
 
     # x, y coordinates of the first bubble
-    column_start_x, row_start_y = find_second_bubble_position(aligned_gray_image)
+    column_start_x, row_start_y = find_first_bubble_position(aligned_gray_image)
 
     # The spacing between columns
     column_spacing = int(os.getenv("column_spacing"))
