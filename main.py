@@ -96,6 +96,12 @@ def find_first_bubble_position(aligned_image):
     kernel = np.ones((3, 3), np.uint8)
     binary_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, kernel)
 
+    # Get minimum bubble size from environment variable or set default
+    min_bubble_size = int(os.getenv("min_bubble_size", 20))
+
+    # Get the minimum y-value to start searching for bubbles
+    bubble_search_y_initial_value = int(os.getenv("bubble_search_y_initial_value", 0))
+
     # Find contours in the binary image
     contours, _ = cv2.findContours(
         binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -103,9 +109,6 @@ def find_first_bubble_position(aligned_image):
 
     # List to hold bubble contours and their bounding rectangles
     bubbles = []
-
-    # Get minimum bubble size from environment variable or set default
-    min_bubble_size = int(os.getenv("min_bubble_size", 20))
 
     # Loop over the contours
     for contour in contours:
@@ -118,6 +121,10 @@ def find_first_bubble_position(aligned_image):
 
         # Get bounding rectangle
         x, y, w, h = cv2.boundingRect(contour)
+
+        # Filter out contours above the minimum y-value
+        if y < bubble_search_y_initial_value:
+            continue  # Skip contours above the minimum y-value
 
         # Filter based on width and height (minimum size)
         if w < min_bubble_size or h < min_bubble_size:
@@ -151,16 +158,21 @@ def find_first_bubble_position(aligned_image):
     # Get the position of the first bubble
     first_bubble = bubbles[0]
     x, y, w, h = first_bubble['rect']
-    # Return the initial x and y position (top-left corner)
-    calculated_x = x - int(os.getenv("second_bubble_x_offset"))
-    calculated_y = y + int(os.getenv("second_bubble_y_offset"))
+
+    # Apply offsets from environment variables
+    second_bubble_x_offset = int(os.getenv("second_bubble_x_offset", 0))
+    second_bubble_y_offset = int(os.getenv("second_bubble_y_offset", 0))
+    calculated_x = x - second_bubble_x_offset
+    calculated_y = y + second_bubble_y_offset
+
+    # Return the adjusted x and y position (top-left corner)
     return calculated_x, calculated_y
 
 # EASYOCR APPROACH
 # ocr_reader = easyocr.Reader(['pt'])
 
 base_path = os.getenv("base_path")
-images_folder_path = f"{base_path}/imagens"
+images_folder_path = f"{base_path}/arquivos_escaneados"
 template_path = f"{base_path}/gabarito.xlsx"
 
 images_list = glob.glob(f"{images_folder_path}/*")
@@ -202,9 +214,12 @@ for file_path in images_list:
     # Align the image
     aligned_gray_image = align_image(gray_image)
 
+    # x, y coordinates of the first bubble
+    column_start_x, row_start_y = find_first_bubble_position(aligned_gray_image)
+
     # Getting exam_identifier
-    exam_identifier_start_x = int(os.getenv("exam_identifier_start_x"))
-    exam_identifier_start_y = int(os.getenv("exam_identifier_start_y"))
+    exam_identifier_start_x = column_start_x - int(os.getenv("exam_identifier_offset_x"))
+    exam_identifier_start_y = row_start_y - int(os.getenv("exam_identifier_offset_y"))
     exam_identifier_height = int(os.getenv("exam_identifier_height"))
     exam_identifier_width = int(os.getenv("exam_identifier_width"))
     exam_identifier_area = aligned_gray_image.crop((exam_identifier_start_x, exam_identifier_start_y, exam_identifier_start_x + exam_identifier_width, exam_identifier_start_y + exam_identifier_height))
@@ -244,9 +259,6 @@ for file_path in images_list:
     # Quantity of alternatives
     alternatives_quantity = 5
     alternatives = ['A', 'B', 'C', 'D', 'E']
-
-    # x, y coordinates of the first bubble
-    column_start_x, row_start_y = find_first_bubble_position(aligned_gray_image)
 
     # The spacing between columns
     column_spacing = int(os.getenv("column_spacing"))
