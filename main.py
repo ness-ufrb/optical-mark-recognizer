@@ -79,6 +79,81 @@ def align_image(gray_image):
 
     return aligned_gray_image
 
+
+def find_second_bubble_position(aligned_image):
+    # Convert PIL image to OpenCV format
+    image_cv = np.array(aligned_image)
+
+    # Check if the image has multiple channels (e.g., RGB)
+    if len(image_cv.shape) == 3:
+        # If so, convert to grayscale
+        image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2GRAY)
+
+    # Apply binary thresholding (invert image so bubbles are white on black background)
+    _, binary_image = cv2.threshold(image_cv, 128, 255, cv2.THRESH_BINARY_INV)
+
+    # Optionally, apply morphological operations to remove small noise
+    kernel = np.ones((3, 3), np.uint8)
+    binary_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, kernel)
+
+    # Find contours in the binary image
+    contours, _ = cv2.findContours(
+        binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    # List to hold bubble contours and their bounding rectangles
+    bubbles = []
+
+    # Get minimum bubble size from environment variable or set default
+    min_bubble_size = int(os.getenv("min_bubble_size", 20))
+
+    # Loop over the contours
+    for contour in contours:
+        # Calculate area
+        area = cv2.contourArea(contour)
+
+        # Filter contours based on area (adjust thresholds as needed)
+        if area < 100 or area > 10000:
+            continue  # Skip contours that are too small or too large
+
+        # Get bounding rectangle
+        x, y, w, h = cv2.boundingRect(contour)
+
+        # Filter based on width and height (minimum size)
+        if w < min_bubble_size or h < min_bubble_size:
+            continue  # Skip contours smaller than minimum size
+
+        # Optionally, filter based on aspect ratio (if bubbles are approximately circular)
+        aspect_ratio = float(w) / h
+        if aspect_ratio < 0.8 or aspect_ratio > 1.2:
+            continue  # Skip contours that are not roughly square
+
+        # Calculate perimeter
+        perimeter = cv2.arcLength(contour, True)
+
+        # Calculate circularity
+        circularity = 4 * np.pi * (area / (perimeter * perimeter))
+
+        # Filter based on circularity
+        if circularity < 0.7:
+            continue  # Skip non-circular contours
+
+        # Append to bubbles list
+        bubbles.append({'contour': contour, 'rect': (x, y, w, h)})
+
+    if len(bubbles) < 2:
+        print("Less than two bubbles detected in the image.")
+        return None, None
+
+    # Sort the bubbles from top to bottom, then left to right, using 'rect' positions
+    bubbles = sorted(bubbles, key=lambda b: (b['rect'][1], b['rect'][0]))
+
+    # Get the position of the second bubble
+    second_bubble = bubbles[1]
+    x, y, w, h = second_bubble['rect']
+    # Return the initial x and y position (top-left corner)
+    return x, y
+
 # EASYOCR APPROACH
 # ocr_reader = easyocr.Reader(['pt'])
 
@@ -100,7 +175,7 @@ question_index_initial_value = int(os.getenv("question_index_initial_value"))
 black_pixels_threshold = int(os.getenv("black_pixels_threshold"))
 
 results.append({
-    'name': 'Gabarito',
+    'exam_identifier': 'Gabarito',
     'file': 'N/A',
     'correct_questions_quantity': total_questions,
     'correct_questions_percentage': 100,
@@ -125,31 +200,35 @@ for file_path in images_list:
     # Align the image
     aligned_gray_image = align_image(gray_image)
 
-    # Getting name
-    name_start_x = int(os.getenv("name_start_x"))
-    name_start_y = int(os.getenv("name_start_y"))
-    name_height = int(os.getenv("name_height"))
-    name_width = int(os.getenv("name_width"))
-    name_area = aligned_gray_image.crop((name_start_x, name_start_y, name_start_x + name_width, name_start_y + name_height))
+    # Getting exam_identifier
+    exam_identifier_start_x = int(os.getenv("exam_identifier_start_x"))
+    exam_identifier_start_y = int(os.getenv("exam_identifier_start_y"))
+    exam_identifier_height = int(os.getenv("exam_identifier_height"))
+    exam_identifier_width = int(os.getenv("exam_identifier_width"))
+    exam_identifier_area = aligned_gray_image.crop((exam_identifier_start_x, exam_identifier_start_y, exam_identifier_start_x + exam_identifier_width, exam_identifier_start_y + exam_identifier_height))
 
     #### FOR TESTING PURPOSES ONLY ####
-    # name_area.save('name_area.png')
+    # exam_identifier_area.save('exam_identifier_area.png')
     # exit()
     #### FOR TESTING PURPOSES ONLY ####
 
-    name = pytesseract.image_to_string(name_area)
+    # Specify the whitelist of characters (numbers, letters, and space)
+    custom_config = "-c tessedit_char_whitelist=" + os.getenv("exam_identifier_whitelist") + ' --psm 6'
+
+    # Use pytesseract with the custom configuration
+    exam_identifier = pytesseract.image_to_string(exam_identifier_area, config=custom_config)
 
     # EASYOCR APPROACH
     # img_byte_arr = io.BytesIO()
-    # name_area.save(img_byte_arr, format='PNG')
+    # exam_identifier_area.save(img_byte_arr, format='PNG')
     # img_byte_arr = img_byte_arr.getvalue()
     # ocr_result = ocr_reader.readtext(img_byte_arr)
     
-    # name = ''
+    # exam_identifier = ''
     # for result_set in ocr_result:
     #     for item in result_set:
     #         if (isinstance(item, str)) and len(item) > 5:
-    #             name = item
+    #             exam_identifier = item
 
     # Black pixel limit verification
     dark_pixel_threshold = int(os.getenv("dark_pixel_threshold"))
@@ -164,13 +243,14 @@ for file_path in images_list:
     alternatives_quantity = 5
     alternatives = ['A', 'B', 'C', 'D', 'E']
 
-    # The x-coordinate of the first column and spacing between columns
-    column_start_x = int(os.getenv("column_start_x"))
+    # x, y coordinates of the first bubble
+    column_start_x, row_start_y = find_second_bubble_position(aligned_gray_image)
+
+    # The spacing between columns
     column_spacing = int(os.getenv("column_spacing"))
     block_spacing = int(os.getenv("block_spacing"))
 
-    # The y-coordinate of the first row and spacing between rows
-    row_start_y = int(os.getenv("row_start_y"))
+    # The spacing between rows
     row_spacing = int(os.getenv("row_spacing"))
 
     # The width and height of each circle
@@ -197,7 +277,7 @@ for file_path in images_list:
                 mark_area = binary_image.crop((col, row, col + circle_width, row + circle_height))
                 
                 #### FOR TESTING PURPOSES ONLY ####
-                if question_index + 1 == 2 or question_index + 1 == 10 or question_index + 1 == 15:
+                if question_index + 1 == 1 or question_index + 1 == 2 or question_index + 1 == 10  or question_index + 1 == 11:
                     question_area = aligned_gray_image.crop((col, row, col + circle_width, row + circle_height))
                     question_area.save(f"question_{question_index+1}_item_{col_index}.png")
                 #### FOR TESTING PURPOSES ONLY ####
@@ -221,7 +301,7 @@ for file_path in images_list:
     #### FOR TESTING PURPOSES ONLY ####
 
     results.append({
-        'name': name,
+        'exam_identifier': exam_identifier,
         'file': Path(file_path).stem,
         'correct_questions_quantity': correct_questions_quantity,
         'correct_questions_percentage': (correct_questions_quantity / total_questions) * 100,
@@ -237,7 +317,7 @@ worksheet.title = "Gabarito e resultados"
 spreadsheet_row_index = 1
 worksheet.cell(row=spreadsheet_row_index, column=1).value = 'Arquivo'
 worksheet.column_dimensions['A'].width = 50
-worksheet.cell(row=spreadsheet_row_index, column=2).value = 'Nome'
+worksheet.cell(row=spreadsheet_row_index, column=2).value = 'Identificador da prova'
 worksheet.column_dimensions['B'].width = 50
 worksheet.cell(row=spreadsheet_row_index, column=3).value = 'Questões corretas'
 worksheet.column_dimensions['C'].width = 20
@@ -249,7 +329,7 @@ for column_index in range(total_questions):
 spreadsheet_row_index += 1
 for result in results:
     worksheet.cell(row=spreadsheet_row_index, column=1).value = result['file']
-    worksheet.cell(row=spreadsheet_row_index, column=2).value = result['name']
+    worksheet.cell(row=spreadsheet_row_index, column=2).value = result['exam_identifier']
     worksheet.cell(row=spreadsheet_row_index, column=3).value = result['correct_questions_quantity']
     worksheet.cell(row=spreadsheet_row_index, column=4).value = result['correct_questions_percentage']
     for column_index in range(total_questions):
