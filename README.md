@@ -10,12 +10,10 @@ Linux/Mac OS:
 
 ```
 cp env.example .env
-python3.9 -m venv venv
+python -m venv venv
 source venv/bin/activate
 pip install -r ./requirements.txt
-export PYTHONPATH=/home/biobot/ai-codes:$PYTHONPATH (change it to the proper path)
-export PYTHONPATH=/usr/local/Cellar/tesseract/5.4.1/share/tessdata:$PYTHONPATH (change it to the proper path)
-cp env.example .env
+cp env.example.v2 .env
 ```
 
 ## Save dependencies
@@ -27,5 +25,5 @@ pip freeze > requirements.txt
 ## Run
 
 ```
-python main.py
+python omr_v2.py
 ```
