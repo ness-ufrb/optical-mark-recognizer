@@ -13,7 +13,7 @@ cp env.example .env
 python -m venv venv
 source venv/bin/activate
 pip install -r ./requirements.txt
-cp env.example.v2 .env
+cp env.example .env
 ```
 
 ## Save dependencies
@@ -25,5 +25,5 @@ pip freeze > requirements.txt
 ## Run
 
 ```
-python omr_v2.py
+python omr.py
 ```
